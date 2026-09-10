@@ -27,24 +27,24 @@ import time
 
 gvg_metrics = GVGEvaluator(iou_threshold=0.5)
 
-COCO_IMG_DIR = r".\train2014\train2014"
-COCO_2017_IMG_DIR = r".\lvis\val2017"
-COCO_INSTANCES_JSON = r".\annotations_trainval2014\annotations\instances_train2014.json"
-REFCOCO_PKL = r".\refcoco\refs(unc).p"
-REFCOCO_PLUS_PKL = r".\refcoco+\refcoco+\refs(unc).p"
-REFCOCOG_PKL = r".\refcocog\refcocog\refs(umd).p"
-GREFCOCO_JSON = r".\grefcoco\grefs(unc).json"
+COCO_IMG_DIR = "train2014/train2014"
+COCO_2017_IMG_DIR = "lvis/val2017"
+COCO_INSTANCES_JSON = "annotations_trainval2014/annotations/instances_train2014.json"
+REFCOCO_PKL = "refcoco/refs(unc).p"
+REFCOCO_PLUS_PKL = "refcoco+/refcoco+/refcoco+/refs(unc).p"
+REFCOCOG_PKL = "refcocog/refcocog/refs(umd).p"
+GREFCOCO_JSON = "grefcoco/grefs(unc).json"
 
-REFERIT_IMG_DIR = r".\referit\referit\images"
-REFERIT_INSTANCES_JSON = r".\referit\referit\instances.json"
-REFERIT_PKL = r".\referit\referit\refs(berkeley).p"
+REFERIT_IMG_DIR = "referit/referit/images"
+REFERIT_INSTANCES_JSON = "referit/referit/instances.json"
+REFERIT_PKL = "referit/referit/refs(berkeley).p"
 
-FLICKR_IMG_DIR = r".\flickr\flickr30k_images\flickr30k_images"
-FLICKR_ANN_JSON = r".\flickr\annotations.json"
+FLICKR_IMG_DIR = "flickr/flickr/flickr30k_images/flickr30k_images/flickr30k_images"
+FLICKR_ANN_JSON = "flickr/flickr/annotations.json"
 
-VG_IMG_DIR = r".\visual_genome\VG_100K"
-VG_REGIONS_JSON = r".\visual_genome\region_descriptions.json"
-LVIS_ANN_JSON = r".\lvis\lvis_v1_val.json"
+VG_IMG_DIRS = ["visual_genome/VG_100K", "visual_genome/VG_100K_2"]
+VG_REGIONS_JSON = "visual_genome/region_descriptions.json"
+LVIS_ANN_JSON = "lvis/lvis_v1_val.json"
 
 
 def generuj_wykresy_zasobow(
@@ -153,7 +153,6 @@ def generuj_wykresy_percentylowe(
     if len(wszystkie_historie) < 2:
         print("\n[INFO] Za mało modeli do porównania na wykresie.")
         return
-
     metryki = [
         "IoU_Top1",
         "IoU_Top5",
@@ -168,7 +167,6 @@ def generuj_wykresy_percentylowe(
     print(
         f"\n[RYSOWANIE] Generowanie {len(metryki)} wykresów percentylowych do folderu '{folder_wykresow}'..."
     )
-
     percentiles = np.arange(0, 101, 1)
 
     for metryka in metryki:
@@ -179,7 +177,6 @@ def generuj_wykresy_percentylowe(
         for model_name, historia in wszystkie_historie.items():
             if not historia:
                 continue
-
             if metryka not in historia[0]:
                 continue
 
@@ -205,6 +202,7 @@ def generuj_wykresy_percentylowe(
             plt.ylim(0, 1.05)
 
         plt.xlim(0, 100)
+
         plt.legend()
         plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
@@ -243,6 +241,7 @@ def generuj_wykresy_gvg(folder_excel, dataset_name, conf_thresh, folder_wykresow
     )
 
     sns.set_theme(style="whitegrid")
+
     metryki_gvg = [
         ("No-Target Correct Refusals (TN%)", "Poprawne odmowy (%)", 105),
         ("Target F1-Score", "Wartość F1-Score", 1.05),
@@ -390,6 +389,7 @@ def load_dataset(dataset_name, target_split):
         for gref in grefs_data:
             if gref.get("split", "val") != target_split:
                 continue
+
             img_id = gref["image_id"]
             if img_id not in img_id_to_filename:
                 continue
@@ -439,6 +439,7 @@ def load_dataset(dataset_name, target_split):
         }
 
         cat_id_to_name = {c["id"]: c["name"] for c in lvis_data["categories"]}
+
         grouped_anns = {}
         for ann in lvis_data["annotations"]:
             key = (ann["image_id"], ann["category_id"])
@@ -473,8 +474,17 @@ def load_dataset(dataset_name, target_split):
 
         for img_entry in vg_data:
             img_id = img_entry.get("image_id") or img_entry.get("id")
-            img_path = os.path.join(VG_IMG_DIR, f"{img_id}.jpg")
+            img_name = f"{img_id}.jpg"
 
+            img_path = None
+            for base_dir in VG_IMG_DIRS:
+                temp_path = os.path.join(base_dir, img_name)
+                if os.path.exists(temp_path):
+                    img_path = temp_path
+                    break
+
+            if img_path is None:
+                continue
             for region in img_entry["regions"][:5]:
                 dataset.append(
                     {
@@ -492,10 +502,10 @@ def load_dataset(dataset_name, target_split):
                     }
                 )
 
-    MAX_SAMPLES = 10000
+    MAX_SAMPLES = 10
     if len(dataset) > MAX_SAMPLES:
         print(
-            f"-> UWAGA: Ucinam {len(dataset)} celów do bezpiecznego limitu: {MAX_SAMPLES}"
+            f"-> UWAGA: Ocinam {len(dataset)} celów do bezpiecznego limitu: {MAX_SAMPLES}"
         )
         dataset = dataset[:MAX_SAMPLES]
 
@@ -573,6 +583,83 @@ def run_evaluation(
         ).to(device)
 
     historia_wynikow = []
+    if torch.cuda.is_available() and len(dataset) > 0:
+        print(f"\n[INFO] Rozgrzewanie GPU dla modelu {model_name.upper()}...")
+        dummy_data = dataset[0]
+        dummy_prompt = dummy_data["prompt"]
+        dummy_is_flickr = dummy_data.get("is_flickr", False)
+        dummy_context = (
+            dummy_data.get("full_sentence", dummy_prompt)
+            if dummy_is_flickr
+            else dummy_prompt
+        )
+
+        try:
+            dummy_image = Image.open(dummy_data["image_path"]).convert("RGB")
+
+            for _ in range(3):
+                if model_name == "yolo":
+                    model.set_classes([dummy_prompt])
+                    _ = model(dummy_image, verbose=False)
+                elif model_name == "owlv2":
+                    inputs = processor(
+                        text=[[f"a photo of {dummy_prompt}"]],
+                        images=dummy_image,
+                        return_tensors="pt",
+                    ).to(device)
+                    with torch.no_grad():
+                        _ = model(**inputs)
+                elif model_name == "kosmos2":
+                    text_input = (
+                        f"An image of <grounding> <phrase> {dummy_prompt} </phrase>"
+                    )
+                    inputs = processor(
+                        text=text_input, images=dummy_image, return_tensors="pt"
+                    ).to(device)
+                    with torch.no_grad():
+                        _ = model.generate(
+                            pixel_values=inputs["pixel_values"],
+                            input_ids=inputs["input_ids"],
+                            attention_mask=inputs["attention_mask"],
+                            image_embeds=None,
+                            image_embeds_position_mask=inputs[
+                                "image_embeds_position_mask"
+                            ],
+                            use_cache=True,
+                            max_new_tokens=10,
+                            num_beams=1,
+                            do_sample=False,
+                        )
+                elif model_name == "florence":
+                    text_input = task_prompt + dummy_context
+                    inputs = processor(
+                        text=text_input, images=dummy_image, return_tensors="pt"
+                    ).to(device)
+                    inputs["pixel_values"] = inputs["pixel_values"].to(torch.float32)
+                    with torch.no_grad():
+                        _ = model.generate(
+                            input_ids=inputs["input_ids"],
+                            pixel_values=inputs["pixel_values"],
+                            max_new_tokens=10,
+                            num_beams=1,
+                            do_sample=False,
+                        )
+                elif model_name == "dino":
+                    prompt_with_dot = (
+                        dummy_context
+                        if dummy_context.endswith(".")
+                        else dummy_context + "."
+                    )
+                    inputs = processor(
+                        images=dummy_image, text=prompt_with_dot, return_tensors="pt"
+                    ).to(device)
+                    with torch.no_grad():
+                        _ = model(**inputs)
+
+            torch.cuda.synchronize(device)
+            print("[INFO] GPU gotowe do pomiarów!")
+        except Exception as e:
+            print(f"[OSTRZEŻENIE] Błąd podczas rozgrzewki: {e}")
 
     katalog_bledow = os.path.join(
         glowny_folder_bledow, f"bledy_{model_name}_{dataset_name}_{split_name}"
@@ -603,10 +690,12 @@ def run_evaluation(
             image = Image.open(img_path).convert("RGB")
         except Exception:
             continue
+
         best_iou_top1, best_iou_top5 = 0.0, 0.0
         boxes = []
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats(device)
+            torch.cuda.synchronize(device)
 
         start_time = time.perf_counter()
 
@@ -654,24 +743,39 @@ def run_evaluation(
                 generated_text = processor.batch_decode(
                     generated_ids, skip_special_tokens=False
                 )[0]
-                print(generated_text)
-                _, entities = processor.post_process_generation(generated_text)
-                parsed_boxes = []
 
-                for entity in entities:
-                    for b in entity[2]:
-                        parsed_boxes.append(
-                            [
-                                b[0] * image.width,
-                                b[1] * image.height,
-                                b[2] * image.width,
-                                b[3] * image.height,
-                            ]
-                        )
-                boxes = parsed_boxes
+                try:
+                    _, entities = processor.post_process_generation(generated_text)
+                    parsed_boxes = []
+
+                    for entity in entities:
+                        phrase_name = entity[0]
+                        ramki = entity[2]
+                        if is_flickr:
+                            if (
+                                prompt.lower() not in phrase_name.lower()
+                                and phrase_name.lower() not in prompt.lower()
+                            ):
+                                continue
+
+                        for b in ramki:
+                            parsed_boxes.append(
+                                [
+                                    b[0] * image.width,
+                                    b[1] * image.height,
+                                    b[2] * image.width,
+                                    b[3] * image.height,
+                                ]
+                            )
+                    boxes = parsed_boxes
+
+                except Exception as e:
+                    print(f"\n[BŁĄD KOSMOS-2] Wyjątek podczas parsowania: {e}")
+                    print(f"Surowy tekst wygenerowany: {generated_text}")
+                    boxes = []
 
             elif model_name == "florence":
-                text_input = task_prompt + context_text
+                text_input = task_prompt + prompt
                 inputs = processor(
                     text=text_input, images=image, return_tensors="pt"
                 ).to(device)
@@ -693,10 +797,25 @@ def run_evaluation(
                         task=task_prompt,
                         image_size=(image.width, image.height),
                     )
-                    res = parsed.get(task_prompt, {})
+                    if parsed:
+                        klucz_wyniku = (
+                            task_prompt
+                            if task_prompt in parsed
+                            else list(parsed.keys())[0]
+                        )
+                        res = parsed.get(klucz_wyniku, {})
+                    else:
+                        res = {}
+
+                    etykiety = res.get(
+                        "labels",
+                        res.get("bboxes_labels", res.get("polygons_labels", [])),
+                    )
+                    ramki = res.get("bboxes", [])
+
                     if is_flickr:
                         matched_boxes = []
-                        for b, l in zip(res.get("bboxes", []), res.get("labels", [])):
+                        for b, l in zip(ramki, etykiety):
                             if (
                                 prompt.lower() in l.lower()
                                 or l.lower() in prompt.lower()
@@ -704,8 +823,10 @@ def run_evaluation(
                                 matched_boxes.append(b)
                         boxes = matched_boxes
                     else:
-                        boxes = res.get("bboxes", [])
-                except Exception:
+                        boxes = ramki
+
+                except Exception as e:
+                    print(f"Błąd parsowania: {e}")
                     pass
 
             elif model_name == "dino":
@@ -745,7 +866,10 @@ def run_evaluation(
                         boxes = all_boxes[(-all_scores).argsort()]
 
         except Exception:
-            pass
+            continue
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(device)
 
         end_time = time.perf_counter()
 
@@ -755,9 +879,9 @@ def run_evaluation(
         vram_mb = 0.0
         if torch.cuda.is_available():
             vram_mb = torch.cuda.max_memory_allocated(device) / (1024 * 1024)
+
         if is_grefcoco:
             gvg_metrics.add_sample(pred_boxes=boxes, gt_boxes=gt_boxes)
-        # -------------------------------
 
         if len(boxes) > 0:
             best_iou_top1 = calculate_max_iou_for_multiple_targets(boxes[0], gt_boxes)
@@ -767,12 +891,15 @@ def run_evaluation(
                     for box in boxes[:5]
                 ]
             )
+
             if best_iou_top1 == 0.0 and zapisane_bledy < 10:
                 try:
                     img_error = Image.open(img_path).convert("RGB")
                     draw = ImageDraw.Draw(img_error)
+
                     for gt in gt_boxes:
                         draw.rectangle(gt, outline="green", width=5)
+
                     draw.rectangle(boxes[0], outline="red", width=5)
 
                     bezpieczny_prompt = "".join(
@@ -786,8 +913,7 @@ def run_evaluation(
                     zapisane_bledy += 1
                 except Exception as e:
                     pass
-
-            elif best_iou_top1 >= 0.95 and zapisane_sukcesy < 10:
+            elif best_iou_top1 >= 0.95 and zapisane_sukcesy < 20:
                 try:
                     img_success = Image.open(img_path).convert("RGB")
                     draw = ImageDraw.Draw(img_success)
@@ -843,7 +969,8 @@ def run_evaluation(
             }
         )
 
-        if (i + 1) % 10 == 0 or (i + 1) == total_samples:
+        if (i + 1) % 100 == 0 or (i + 1) == total_samples:
+            current_miou_t1 = total_iou_top1 / (i + 1)
 
             print(
                 f"[{model_name.upper()}] Krok {i + 1}/{total_samples} |IoU(T1): {best_iou_top1:.3f} | T1@0.5: {(t1_at_05/(i+1))*100:.1f}% | T5@0.5: {(t5_at_05/(i+1))*100:.1f}%"
@@ -856,6 +983,7 @@ def run_evaluation(
         import csv
 
         raport = gvg_metrics.get_results()
+
         raport_z_tagami = {
             "Model": model_name,
             "Zbiór": dataset_name,
@@ -922,7 +1050,7 @@ if __name__ == "__main__":
         "referit": ["train", "val", "test", "trainval"],
         "grefcoco": ["train", "val", "testA", "testB"],
         "flickr30k": ["train", "val", "test"],
-        "visual_genome": ["train", "test", "val"],
+        "visual_genome": ["train", "val"],
         "lvis": ["val"],
     }
 
@@ -947,19 +1075,14 @@ if __name__ == "__main__":
     SESSION_TIMESTAMP = now.strftime("%Y-%m-%d_%H-%M-%S")
 
     bezpieczny_dataset = args.dataset.replace("+", "plus")
-
-    FOLDER_EXCEL = (
-        f"wyniki_excel_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
-    )
-    FOLDER_BLEDOW = (
-        f"wszystkie_bledy_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
-    )
-    FOLDER_SUKCESOW = (
-        f"wszystkie_sukcesy_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
-    )
-    FOLDER_WYKRESOW = (
-        f"wykresy_wynikowe_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
-    )
+    if args.yolo or args.dino or args.owlv2:
+        modele = "yolo_dino_owl"
+    else:
+        modele = "florence_kosmos"
+    FOLDER_EXCEL = f"wyniki_{modele}_excel_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
+    FOLDER_BLEDOW = f"wszystkie_{modele}_bledy_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
+    FOLDER_SUKCESOW = f"wszystkie_{modele}_sukcesy_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
+    FOLDER_WYKRESOW = f"wykresy_{modele}_wynikowe_{bezpieczny_dataset}_conf{args.conf}_{SESSION_TIMESTAMP}"
 
     os.makedirs(FOLDER_EXCEL, exist_ok=True)
     os.makedirs(FOLDER_BLEDOW, exist_ok=True)

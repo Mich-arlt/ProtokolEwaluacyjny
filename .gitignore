@@ -11,3 +11,6 @@
 *.pt
 *.avi
 *.xlsx
+*.ts
+!requirements.txt
+!requirements_omdet.txt
