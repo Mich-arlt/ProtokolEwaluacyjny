@@ -28,9 +28,9 @@ Zbiór danych(--dataset) | Dostępne flagi --split               | Opis podzbior
 refcoco+                | train, val, testA, testB             | testA: tylko ludzie, testB: obiekty bez ludzi
 refcocog                | train, val, test                     | Klasyczny 
 grefcoco                | train, val, testA, testB             | testA: tylko ludzie, testB: obiekty bez ludzi
-referit                 | train, val, test, trainval           | Klasyczny
+referit                 | train, val, test                     | Klasyczny
 flickr30k               | train, val, test                     | Klasyczny
-visual_genome           | val, wszystko                        | val: pierwsze 5000 zdjęć (szybki test), wszystko: pełna baza
+visual_genome           | val                                  | val: pierwsze obrazy
 
 ### 4. Wybór progu pewności (--conf)
 Określa minimalną pewność modelu wymaganą do zatwierdzenia ramki (domyślnie 0.25). 
@@ -39,7 +39,7 @@ Modele nie uwzględniające progu pominą flagę.
 
 ### 5. Zapis wyników i ograniczenia sprzętowe (Ważne!)
     * Generowanie Excela: Skrypt co 50 testowanych obiektów automatycznie zapisuje/nadpisuje plik .xlsx z pełną historią (mIoU, Top-1, Top-5, progi: 0.5, 0.7, 0.9).
-    * Limit bezpieczeństwa: Zbiory giganty (jak VG czy Flickr30k) są automatycznie ucinane do maksymalnie 15 000 próbek na test, aby zapobiec wielodniowemu obciążeniu karty graficznej.
+    * Limit bezpieczeństwa: Zbiory giganty (jak VG czy Flickr30k) są automatycznie ucinane do maksymalnie 10 000 próbek na test, aby zapobiec wielodniowemu obciążeniu karty graficznej.
 
 ### 6. Przykłady Użycia
 

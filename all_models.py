@@ -502,7 +502,7 @@ def load_dataset(dataset_name, target_split):
                     }
                 )
 
-    MAX_SAMPLES = 10
+    MAX_SAMPLES = 10000
     if len(dataset) > MAX_SAMPLES:
         print(
             f"-> UWAGA: Ocinam {len(dataset)} celów do bezpiecznego limitu: {MAX_SAMPLES}"
