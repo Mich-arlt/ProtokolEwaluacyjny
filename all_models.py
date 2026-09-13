@@ -600,7 +600,7 @@ def run_evaluation(
             for _ in range(3):
                 if model_name == "yolo":
                     model.set_classes([dummy_prompt])
-                    _ = model(dummy_image, verbose=False)
+                    _ = model(dummy_image, conf=0.05, verbose=False)
                 elif model_name == "owlv2":
                     inputs = processor(
                         text=[[f"a photo of {dummy_prompt}"]],
@@ -702,7 +702,7 @@ def run_evaluation(
         try:
             if model_name == "yolo":
                 model.set_classes([prompt])
-                results = model(image, verbose=False)
+                results = model(image, conf=0.05, verbose=False)
                 all_boxes = results[0].boxes.xyxy.cpu().numpy()
                 all_confs = results[0].boxes.conf.cpu().numpy()
                 boxes = all_boxes[all_confs >= conf_thresh]
@@ -1036,7 +1036,7 @@ if __name__ == "__main__":
             "visual_genome",
             "lvis",
         ],
-        default="refcoco+",
+        default="refcoco",
     )
     parser.add_argument("--split", type=str, default="val")
     parser.add_argument("--conf", type=float, default=0.25)
@@ -1050,7 +1050,7 @@ if __name__ == "__main__":
         "referit": ["train", "val", "test", "trainval"],
         "grefcoco": ["train", "val", "testA", "testB"],
         "flickr30k": ["train", "val", "test"],
-        "visual_genome": ["train", "val"],
+        "visual_genome": ["val"],
         "lvis": ["val"],
     }
 
